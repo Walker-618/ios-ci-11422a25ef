@@ -25,8 +25,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release download build-input --pattern inputs.bin
-          python runner-crypto.py decrypt inputs.bin inputs.zip
+          gh release download build-input --pattern inputs-v2.bin
+          python runner-crypto.py decrypt inputs-v2.bin inputs.zip
           mkdir app result
           unzip -q inputs.zip -d app
           set +e
