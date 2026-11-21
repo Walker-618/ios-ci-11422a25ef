@@ -1,0 +1,66 @@
+name: Isolated iOS 18 tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/m0-qaclip]
+    paths: ['.github/workflows/ios18.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build tools
+        run: |
+          python -m pip install --disable-pip-version-check cryptography==50.0.2
+          brew install xcodegen
+      - name: Run authenticated iOS validation and build
+        env:
+          CI_PAYLOAD_KEY: ${{ secrets.CI_PAYLOAD_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download build-input --pattern inputs-v2.bin
+          python runner-crypto.py decrypt inputs-v2.bin inputs.zip
+          mkdir app result
+          unzip -q inputs.zip -d app
+          set +e
+          bash -euo pipefail <<'BUILD' > result/Build.log 2>&1
+            cd app
+            export PTS_BUILD_SOURCE="$(cat source-commit.txt)"
+            mkdir -p build/model-validation/{UFormPreview,TinyTranslationCoreML}
+            cp ci-inputs/Picbi-Build48-uform-models.zip build/
+            tr -d '\r' < scripts/uform48-assets.sha256 | shasum -a 256 -c
+            unzip -q build/Picbi-Build48-uform-models.zip -d build/model-validation/UFormPreview
+            echo '8fb31f86c48d5dc26dce1d6c6d6255d3ed3ff81c4eaf958e889383cb89c19678  ci-inputs/Picbi-Build47-b32-tiny-coreml.zip' | shasum -a 256 -c
+            unzip -q ci-inputs/Picbi-Build47-b32-tiny-coreml.zip -d build/model-validation/TinyTranslationCoreML
+            path=$(find /Applications -maxdepth 1 -type d -name 'Xcode_26*.app' | sort | tail -n 1)
+            test -n "$path"
+            export DEVELOPER_DIR="$path/Contents/Developer"
+            xcodebuild -version
+            xcrun simctl list devices available --json | python -c 'import json, sys; assert any("iOS-18-" in key and value for key, value in json.load(sys.stdin)["devices"].items()), "No available iOS 18 runtime"'
+            bash scripts/verify-uform-ios.sh
+          BUILD
+          status=$?
+          set -e
+          for file in app/dist/Picbi-UForm3-unsigned.ipa app/dist/Picbi-UForm3-build.txt app/build/model-validation/UFormSimulatorTests.log; do
+            if [[ -f "$file" ]]; then cp "$file" result/; fi
+          done
+          cp app/source-commit.txt result/
+          printf '%s\n' "$status" > result/status.txt
+          (cd result && zip -0 ../results.zip ./* >/dev/null)
+          python runner-crypto.py encrypt results.zip result.bin
+          exit "$status"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: encrypted-ios-result
+          path: result.bin
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 2
