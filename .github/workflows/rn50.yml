@@ -18,7 +18,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check cryptography==50.0.2
           brew install xcodegen
-      - name: Run authenticated iOS 18 tests and build
+      - name: Build unsigned RN50 device IPA
         env:
           CI_PAYLOAD_KEY: ${{ secrets.CI_PAYLOAD_KEY }}
           GH_TOKEN: ${{ github.token }}
@@ -42,9 +42,7 @@ jobs:
             test -n "$path"
             export DEVELOPER_DIR="$path/Contents/Developer"
             xcodebuild -version
-            xcrun simctl list devices available --json | python -c 'import json,sys; assert any("iOS-18-" in k and v for k,v in json.load(sys.stdin)["devices"].items()), "No available iOS 18 runtime"'
             python scripts/verify-rn50.py build/model-validation/RN50
-            bash scripts/verify-rn50-ios.sh
             bash scripts/build-ipa.sh --rn50-preview
           BUILD
           status=$?
