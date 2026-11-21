@@ -25,9 +25,9 @@ jobs:
         run: |
           set -euo pipefail
           gh release download build-input --pattern inputs-v2.bin
-          gh release download build-input --pattern mobileclip-v1.bin
+          gh release download build-input --pattern mobileclip-v2.bin
           python runner-crypto.py decrypt inputs-v2.bin inputs.zip
-          python runner-crypto.py decrypt mobileclip-v1.bin overlay.zip
+          python runner-crypto.py decrypt mobileclip-v2.bin overlay.zip
           mkdir app result
           unzip -q inputs.zip -d app
           unzip -o -q overlay.zip -d app
