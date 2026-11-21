@@ -29,6 +29,9 @@ jobs:
           python runner-crypto.py decrypt inputs-v2.bin inputs.zip
           mkdir app result
           unzip -q inputs.zip -d app
+          gh release download build-input --pattern uform-translation.bin
+          python runner-crypto.py decrypt uform-translation.bin translation.zip
+          unzip -o -q translation.zip -d app
           set +e
           bash -euo pipefail <<'BUILD' > result/Build.log 2>&1
             cd app

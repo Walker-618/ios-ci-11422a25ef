@@ -32,6 +32,9 @@ jobs:
           gh release download build-input --pattern stages.bin
           python runner-crypto.py decrypt stages.bin stages.zip
           unzip -o -q stages.zip -d app
+          gh release download build-input --pattern manual-translation.bin
+          python runner-crypto.py decrypt manual-translation.bin translation.zip
+          unzip -o -q translation.zip -d app
           set +e
           bash -euo pipefail <<'BUILD' > result/Build.log 2>&1
             cd app
