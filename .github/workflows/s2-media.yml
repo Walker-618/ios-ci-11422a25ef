@@ -28,8 +28,8 @@ jobs:
           gh release download build-input --pattern mobileclip-v2.bin
           python runner-crypto.py decrypt inputs-v2.bin inputs.zip
           python runner-crypto.py decrypt mobileclip-v2.bin overlay.zip
-          gh release download build-input --pattern s2-media-v2.bin
-          python runner-crypto.py decrypt s2-media-v2.bin patch.zip
+          gh release download build-input --pattern s2-media-v3.bin
+          python runner-crypto.py decrypt s2-media-v3.bin patch.zip
           mkdir app result
           unzip -q inputs.zip -d app
           unzip -o -q overlay.zip -d app
