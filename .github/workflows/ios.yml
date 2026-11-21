@@ -1,6 +1,9 @@
 name: Isolated iOS build
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/m0-qaclip]
+    paths: ['.github/workflows/ios.yml']
 permissions:
   contents: read
 jobs:
