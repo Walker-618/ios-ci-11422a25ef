@@ -1,0 +1,64 @@
+name: Isolated RN50 preview
+on:
+  push:
+    branches: [codex/m0-qaclip]
+    paths: ['.github/workflows/rn50.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build tools
+        run: |
+          python -m pip install --disable-pip-version-check cryptography==50.0.2
+          brew install xcodegen
+      - name: Run authenticated iOS 18 tests and build
+        env:
+          CI_PAYLOAD_KEY: ${{ secrets.CI_PAYLOAD_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download build-input --pattern inputs-v2.bin
+          gh release download build-input --pattern rn50-v1.bin
+          python runner-crypto.py decrypt inputs-v2.bin inputs.zip
+          python runner-crypto.py decrypt rn50-v1.bin overlay.zip
+          mkdir app result
+          unzip -q inputs.zip -d app
+          unzip -o -q overlay.zip -d app
+          set +e
+          bash -euo pipefail <<'BUILD' > result/Build.log 2>&1
+            cd app
+            export PTS_BUILD_SOURCE="$(cat source-commit.txt)"
+            path=$(find /Applications -maxdepth 1 -type d -name 'Xcode_26*.app' | sort | tail -n 1)
+            test -n "$path"
+            export DEVELOPER_DIR="$path/Contents/Developer"
+            xcodebuild -version
+            xcrun simctl list devices available --json | python -c 'import json,sys; assert any("iOS-18-" in k and v for k,v in json.load(sys.stdin)["devices"].items()), "No available iOS 18 runtime"'
+            python scripts/verify-rn50.py build/model-validation/RN50
+            bash scripts/verify-rn50-ios.sh
+            bash scripts/build-ipa.sh --rn50-preview
+          BUILD
+          status=$?
+          set -e
+          for file in app/dist/Picbi-RN50-unsigned.ipa app/dist/Picbi-RN50-build.txt app/build/model-validation/RN50SimulatorTests.log; do
+            if [[ -f "$file" ]]; then cp "$file" result/; fi
+          done
+          cp app/source-commit.txt result/
+          printf '%s\n' "$status" > result/status.txt
+          (cd result && zip -0 ../results.zip ./* >/dev/null)
+          python runner-crypto.py encrypt results.zip result.bin
+          exit "$status"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: encrypted-rn50-result
+          path: result.bin
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 2
