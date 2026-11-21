@@ -35,7 +35,7 @@ jobs:
             export PTS_BUILD_SOURCE="$(cat source-commit.txt)"
             mkdir -p build/model-validation/{UFormPreview,TinyTranslationCoreML}
             cp ci-inputs/Picbi-Build48-uform-models.zip build/
-            shasum -a 256 -c scripts/uform48-assets.sha256
+            tr -d '\r' < scripts/uform48-assets.sha256 | shasum -a 256 -c
             unzip -q build/Picbi-Build48-uform-models.zip -d build/model-validation/UFormPreview
             echo '8fb31f86c48d5dc26dce1d6c6d6255d3ed3ff81c4eaf958e889383cb89c19678  ci-inputs/Picbi-Build47-b32-tiny-coreml.zip' | shasum -a 256 -c
             unzip -q ci-inputs/Picbi-Build47-b32-tiny-coreml.zip -d build/model-validation/TinyTranslationCoreML
