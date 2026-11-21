@@ -26,11 +26,14 @@ jobs:
           set -euo pipefail
           gh release download build-input --pattern inputs-v2.bin
           gh release download build-input --pattern rn50-v2.bin
+          gh release download build-input --pattern rn50-v3.bin
           python runner-crypto.py decrypt inputs-v2.bin inputs.zip
           python runner-crypto.py decrypt rn50-v2.bin overlay.zip
+          python runner-crypto.py decrypt rn50-v3.bin patch.zip
           mkdir app result
           unzip -q inputs.zip -d app
           unzip -o -q overlay.zip -d app
+          unzip -o -q patch.zip -d app
           set +e
           bash -euo pipefail <<'BUILD' > result/Build.log 2>&1
             cd app
