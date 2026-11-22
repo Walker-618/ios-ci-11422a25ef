@@ -25,12 +25,12 @@ jobs:
           gh release download build-input --pattern fg54-models-input-v1.bin
           python runner-crypto.py decrypt fg54-models-input-v1.bin inputs.zip
           unzip -q inputs.zip
-          gh release download build-input --pattern fg54-models-input-v2.bin
-          python runner-crypto.py decrypt fg54-models-input-v2.bin refinement.zip
+          gh release download build-input --pattern fg54-models-input-v3.bin
+          python runner-crypto.py decrypt fg54-models-input-v3.bin refinement.zip
           unzip -o -q refinement.zip
           mkdir result
           set +e
-          python validate.py --candidates candidates --output result/FGCLIP2ANE-Build54 --image-names uncompressed-fp16 uncompressed-pool unfused-pool-fp32 > result/Build.log 2>&1
+          python validate.py --candidates candidates --output result/FGCLIP2ANE-Build54 --image-names gpu-grouped16-fp16 > result/Build.log 2>&1
           status=$?
           set -e
           cp source-commit.txt result/
