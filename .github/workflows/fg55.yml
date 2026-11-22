@@ -1,0 +1,70 @@
+name: Isolated Build55 native media cleanup
+on:
+  push:
+    branches: [codex/m0-qaclip]
+    paths: ['.github/workflows/fg55.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build tools
+        run: |
+          python -m pip install --disable-pip-version-check cryptography==50.0.2 coremltools==8.3.0 numpy==1.26.4 Pillow==11.2.1
+          brew install xcodegen
+      - name: Build unsigned FG-CLIP 2 device IPA
+        env:
+          CI_PAYLOAD_KEY: ${{ secrets.CI_PAYLOAD_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download build-input --pattern inputs-v2.bin
+          gh release download build-input --pattern mobileclip-v2.bin
+          python runner-crypto.py decrypt inputs-v2.bin inputs.zip
+          python runner-crypto.py decrypt mobileclip-v2.bin overlay.zip
+          gh release download build-input --pattern fg54-overlay-v4.bin
+          python runner-crypto.py decrypt fg54-overlay-v4.bin patch.zip
+          gh release download build-input --pattern fg54-validated-model.bin
+          python runner-crypto.py decrypt fg54-validated-model.bin models.zip
+          gh release download build-input --pattern fg55-overlay-v1.bin
+          python runner-crypto.py decrypt fg55-overlay-v1.bin cleanup.zip
+          mkdir app result
+          unzip -q inputs.zip -d app
+          unzip -o -q overlay.zip -d app
+          unzip -o -q patch.zip -d app
+          unzip -q models.zip -d app
+          unzip -o -q cleanup.zip -d app
+          set +e
+          bash -euo pipefail <<'BUILD' > result/Build.log 2>&1
+            cd app
+            export PTS_BUILD_SOURCE="$(cat source-commit.txt)"
+            path=$(find /Applications -maxdepth 1 -type d -name 'Xcode_26*.app' | sort | tail -n 1)
+            test -n "$path"
+            export DEVELOPER_DIR="$path/Contents/Developer"
+            xcodebuild -version
+            bash scripts/build-ipa.sh --fgclip2-ane-fast
+          BUILD
+          status=$?
+          set -e
+          for file in app/dist/Picbi-FGCLIP2-ANE-LUT8-unsigned.ipa app/dist/Picbi-FGCLIP2-ANE-LUT8-build.txt app/dist/FGCLIP2PairRetrieval.json; do
+            if [[ -f "$file" ]]; then cp "$file" result/; fi
+          done
+          cp app/source-commit.txt result/
+          printf '%s\n' "$status" > result/status.txt
+          (cd result && zip -0 ../results.zip ./* >/dev/null)
+          python runner-crypto.py encrypt results.zip result.bin
+          exit "$status"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: encrypted-fg55-result
+          path: result.bin
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 2
