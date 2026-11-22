@@ -25,8 +25,8 @@ jobs:
           gh release download build-input --pattern fg54-models-input-v1.bin
           python runner-crypto.py decrypt fg54-models-input-v1.bin inputs.zip
           unzip -q inputs.zip
-          gh release download build-input --pattern fg54-models-input-v3.bin
-          python runner-crypto.py decrypt fg54-models-input-v3.bin refinement.zip
+          gh release download build-input --pattern fg54-models-input-v4.bin
+          python runner-crypto.py decrypt fg54-models-input-v4.bin refinement.zip
           unzip -o -q refinement.zip
           mkdir result
           set +e
