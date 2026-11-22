@@ -28,8 +28,8 @@ jobs:
           gh release download build-input --pattern mobileclip-v2.bin
           python runner-crypto.py decrypt inputs-v2.bin inputs.zip
           python runner-crypto.py decrypt mobileclip-v2.bin overlay.zip
-          gh release download build-input --pattern fg53-overlay-v1.bin
-          python runner-crypto.py decrypt fg53-overlay-v1.bin patch.zip
+          gh release download build-input --pattern fg53-overlay-v2.bin
+          python runner-crypto.py decrypt fg53-overlay-v2.bin patch.zip
           gh release download build-input --pattern fg53-model.bin
           python runner-crypto.py decrypt fg53-model.bin models.zip
           mkdir app result
