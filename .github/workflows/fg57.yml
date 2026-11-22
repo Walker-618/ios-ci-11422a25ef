@@ -30,14 +30,14 @@ jobs:
           gh release download build-input --pattern fg54-validated-model.bin
           gh release download build-input --pattern fg55-overlay-v1.bin
           gh release download build-input --pattern fg56-overlay-v2.bin
-          gh release download build-input --pattern fg57-overlay-v2.bin
+          gh release download build-input --pattern fg57-overlay-v3.bin
           python runner-crypto.py decrypt inputs-v2.bin inputs.zip
           python runner-crypto.py decrypt mobileclip-v2.bin overlay.zip
           python runner-crypto.py decrypt fg54-overlay-v4.bin patch.zip
           python runner-crypto.py decrypt fg54-validated-model.bin models.zip
           python runner-crypto.py decrypt fg55-overlay-v1.bin cleanup.zip
           python runner-crypto.py decrypt fg56-overlay-v2.bin current.zip
-          python runner-crypto.py decrypt fg57-overlay-v2.bin fix.zip
+          python runner-crypto.py decrypt fg57-overlay-v3.bin fix.zip
           mkdir app result
           unzip -q inputs.zip -d app
           unzip -o -q overlay.zip -d app
