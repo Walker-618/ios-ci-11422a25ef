@@ -1,0 +1,65 @@
+name: Isolated Build54 iOS compile only
+on:
+  push:
+    branches: [codex/m0-qaclip]
+    paths: ['.github/workflows/fg54-compile.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build tools
+        run: |
+          python -m pip install --disable-pip-version-check cryptography==50.0.2
+          brew install xcodegen
+      - name: Compile candidate iOS source without packaging
+        env:
+          CI_PAYLOAD_KEY: ${{ secrets.CI_PAYLOAD_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download build-input --pattern inputs-v2.bin
+          gh release download build-input --pattern mobileclip-v2.bin
+          python runner-crypto.py decrypt inputs-v2.bin inputs.zip
+          python runner-crypto.py decrypt mobileclip-v2.bin overlay.zip
+          gh release download build-input --pattern fg54-overlay-v1.bin
+          python runner-crypto.py decrypt fg54-overlay-v1.bin patch.zip
+          mkdir app result
+          unzip -q inputs.zip -d app
+          unzip -o -q overlay.zip -d app
+          unzip -o -q patch.zip -d app
+          set +e
+          bash -euo pipefail <<'BUILD' > result/Build.log 2>&1
+            cd app
+            export PTS_BUILD_SOURCE="$(cat source-commit.txt)"
+            path=$(find /Applications -maxdepth 1 -type d -name 'Xcode_26*.app' | sort | tail -n 1)
+            test -n "$path"
+            export DEVELOPER_DIR="$path/Contents/Developer"
+            xcodebuild -version
+            xcodegen generate
+            xcodebuild -project PhotoTextSearch.xcodeproj -scheme PhotoTextSearch -configuration Release -destination 'generic/platform=iOS' -derivedDataPath build SWIFT_ACTIVE_COMPILATION_CONDITIONS=PREVIEW_UNLIMITED_INDEX CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+          BUILD
+          status=$?
+          set -e
+          for file in app/dist/Picbi-FGCLIP2-INT8-Fast-unsigned.ipa app/dist/Picbi-FGCLIP2-INT8-Fast-build.txt; do
+            if [[ -f "$file" ]]; then cp "$file" result/; fi
+          done
+          cp app/source-commit.txt result/
+          printf '%s\n' "$status" > result/status.txt
+          (cd result && zip -0 ../results.zip ./* >/dev/null)
+          python runner-crypto.py encrypt results.zip result.bin
+          exit "$status"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: encrypted-fg54-compile-result
+          path: result.bin
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 2
