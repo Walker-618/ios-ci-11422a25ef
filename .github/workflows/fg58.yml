@@ -38,9 +38,9 @@ jobs:
           python runner-crypto.py decrypt fg55-overlay-v1.bin cleanup.zip
           python runner-crypto.py decrypt fg56-overlay-v2.bin current.zip
           python runner-crypto.py decrypt fg57-overlay-v3.bin fix.zip
-          gh release download build-input --pattern fg58-overlay-v1.bin
+          gh release download build-input --pattern fg58-overlay-v2.bin
           gh release download build-input --pattern fg58-models-v1.bin
-          python runner-crypto.py decrypt fg58-overlay-v1.bin build58.zip
+          python runner-crypto.py decrypt fg58-overlay-v2.bin build58.zip
           python runner-crypto.py decrypt fg58-models-v1.bin models58.zip
           mkdir app result
           unzip -q inputs.zip -d app
