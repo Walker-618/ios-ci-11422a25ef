@@ -52,8 +52,8 @@ jobs:
           unzip -o -q fix.zip -d app
           unzip -o -q build58.zip -d app
           unzip -o -q models58.zip -d app
-          gh release download build-input --pattern face-index-ios-compile-v2.bin
-          python runner-crypto.py decrypt face-index-ios-compile-v2.bin face-review.zip
+          gh release download build-input --pattern face-index-ios-compile-v3.bin
+          python runner-crypto.py decrypt face-index-ios-compile-v3.bin face-review.zip
           unzip -o -q face-review.zip -d app
           python - <<'VERIFY'
           import hashlib, json
