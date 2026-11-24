@@ -1,4 +1,4 @@
-name: B32 native tail-width selection
+name: B32 native search scores and tail-width controls
 on:
   push:
     branches: [codex/m0-qaclip]
@@ -49,11 +49,21 @@ jobs:
           python runner-crypto.py decrypt b32-lut8-validation-v2.bin controls.zip
           unzip -o -q candidate.zip -d app
           unzip -o -q controls.zip -d app
-          gh release download build-input --pattern b32-lut8-validation-v8.bin
-          python runner-crypto.py decrypt b32-lut8-validation-v8.bin taps.zip
+          gh release download build-input --pattern b32-lut8-validation-v10.bin
+          python runner-crypto.py decrypt b32-lut8-validation-v10.bin taps.zip
           unzip -q taps.zip
+          python restore-b32-delta.py
           cp candidate-source.txt result/
-          python check-native-tail.py app/build/model-validation/B32LUT8Validation app/controls/VisionFP16.mlpackage result/TailReport.json > result/TailBuild.log 2>&1 || true
+          gh release download build-input --pattern fg58-models-v1.bin
+          python runner-crypto.py decrypt fg58-models-v1.bin baseline.zip
+          unzip -q baseline.zip -d app
+          set +e
+          python check-native-tail.py app/build/model-validation/B32LUT8Validation app/controls/VisionFP16.mlpackage result/TailReport.json > result/TailBuild.log 2>&1
+          tail_status=$?
+          python b32-native-scores.py app/build/model-validation/B32LUT8Validation app/build/model-validation/SigLIP2B32INT8-40000 models/sdpa-lut8.mlpackage result/ScoreReport.json > result/ScoreBuild.log 2>&1
+          score_status=$?
+          set -e
+          printf 'tail=%s\nscore=%s\n' "$tail_status" "$score_status" > result/status.txt
           (cd result && zip -q -0 ../results.zip ./*)
           python runner-crypto.py encrypt results.zip result.bin
       - uses: actions/upload-artifact@v4
