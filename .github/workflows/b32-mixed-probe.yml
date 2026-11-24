@@ -20,8 +20,8 @@ jobs:
           CI_PAYLOAD_KEY: ${{ secrets.B32_MIXED_PROBE_KEY }}
         run: |
           set -euo pipefail
-          gh release download build-input --pattern b32-mixed-probe-20261124-v2.bin
-          python runner-crypto.py decrypt b32-mixed-probe-20261124-v2.bin probe.zip
+          gh release download build-input --pattern b32-mixed-probe-20261124-v3.bin
+          python runner-crypto.py decrypt b32-mixed-probe-20261124-v3.bin probe.zip
           unzip -q probe.zip -d probe
           (cd probe && shasum -a 256 -c SHA256SUMS)
           mkdir result
