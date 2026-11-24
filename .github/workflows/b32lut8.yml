@@ -1,4 +1,4 @@
-name: B32 fused attention and linear LUT8 native controls
+name: B32 native tail-width selection
 on:
   push:
     branches: [codex/m0-qaclip]
@@ -16,7 +16,7 @@ jobs:
           python-version: '3.12'
       - name: Install build tools
         run: |
-          python -m pip install --disable-pip-version-check cryptography==50.0.2
+          python -m pip install --disable-pip-version-check cryptography==50.0.2 coremltools==8.3.0 numpy==1.26.4 Pillow==11.2.1
           brew install xcodegen
       - name: Validate encrypted image candidate and compile iOS
         env:
@@ -49,22 +49,11 @@ jobs:
           python runner-crypto.py decrypt b32-lut8-validation-v2.bin controls.zip
           unzip -o -q candidate.zip -d app
           unzip -o -q controls.zip -d app
-          gh release download build-input --pattern b32-lut8-validation-v7.bin
-          python runner-crypto.py decrypt b32-lut8-validation-v7.bin deltas.zip
-          unzip -q deltas.zip
-          python restore-b32-delta.py
+          gh release download build-input --pattern b32-lut8-validation-v8.bin
+          python runner-crypto.py decrypt b32-lut8-validation-v8.bin taps.zip
+          unzip -q taps.zip
           cp candidate-source.txt result/
-          xcrun --sdk macosx swiftc -parse-as-library app/scripts/check-b32-vision.swift -o compiled/verify
-          model=app/build/model-validation/B32LUT8Validation
-          {
-            for package in models/*.mlpackage; do
-              echo "Candidate: $package"
-              xcrun --sdk macosx coremlcompiler compile "$package" compiled
-              name=$(basename "$package" .mlpackage)
-              compiled/verify "compiled/$name.mlmodelc" "$model" || true
-              compiled/verify "compiled/$name.mlmodelc" "$model" cpuAndNeuralEngine || true
-            done
-          } > result/NativeControls.log 2>&1
+          python check-native-tail.py app/build/model-validation/B32LUT8Validation app/controls/VisionFP16.mlpackage result/TailReport.json > result/TailBuild.log 2>&1 || true
           (cd result && zip -q -0 ../results.zip ./*)
           python runner-crypto.py encrypt results.zip result.bin
       - uses: actions/upload-artifact@v4
