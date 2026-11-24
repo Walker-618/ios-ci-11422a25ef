@@ -1,4 +1,4 @@
-name: B32 alternate native patch embedding
+name: B32 fused attention and linear LUT8 native controls
 on:
   push:
     branches: [codex/m0-qaclip]
@@ -49,8 +49,8 @@ jobs:
           python runner-crypto.py decrypt b32-lut8-validation-v2.bin controls.zip
           unzip -o -q candidate.zip -d app
           unzip -o -q controls.zip -d app
-          gh release download build-input --pattern b32-lut8-validation-v5.bin
-          python runner-crypto.py decrypt b32-lut8-validation-v5.bin deltas.zip
+          gh release download build-input --pattern b32-lut8-validation-v7.bin
+          python runner-crypto.py decrypt b32-lut8-validation-v7.bin deltas.zip
           unzip -q deltas.zip
           python restore-b32-delta.py
           cp candidate-source.txt result/
