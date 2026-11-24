@@ -1,0 +1,43 @@
+name: FG-CLIP 2 native GELU replacements
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check coremltools==9.0 torch==2.8.0 numpy==1.26.4 Pillow==11.2.1 cryptography==50.0.2
+      - env:
+          CI_PAYLOAD_KEY: ${{ secrets.FGCLIP2_V12_AUDIT_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download build-input --pattern fgclip2-accuracy-20261124-v12.bin
+          python runner-crypto.py decrypt fgclip2-accuracy-20261124-v12.bin probe.zip
+          unzip -q probe.zip -d probe
+          (cd probe && shasum -a 256 -c SHA256SUMS)
+          mkdir report
+          cp probe/SHA256SUMS report/
+          (sw_vers; uname -m; sysctl -n hw.model) > report/runner.txt
+          status=0
+          python probe/mac-probe-v12.py probe native > report/model.log 2>&1 || status=$?
+          test ! -f native/FGCLIP2MacReport.json || cp native/FGCLIP2MacReport.json report/
+          for pkg in native/A-*.mlpackage native/B-*.mlpackage; do
+            if [[ -d "$pkg" ]]; then mv "$pkg" report/; fi
+          done
+          printf '%s\n' "$status" > report/status.txt
+          (cd report && zip -q -r ../results.zip ./*)
+          python runner-crypto.py encrypt results.zip result.bin
+          exit "$status"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: encrypted-fgclip2-audit
+          path: result.bin
+          retention-days: 2
+
