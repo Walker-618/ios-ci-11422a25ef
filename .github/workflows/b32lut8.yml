@@ -1,0 +1,133 @@
+name: B32 LUT8 accuracy and device-target compilation
+on:
+  push:
+    branches: [codex/m0-qaclip]
+    paths: ['.github/workflows/b32lut8.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build tools
+        run: |
+          python -m pip install --disable-pip-version-check cryptography==50.0.2
+          brew install xcodegen
+      - name: Validate encrypted image candidate and compile iOS
+        env:
+          CI_PAYLOAD_KEY: ${{ secrets.CI_PAYLOAD_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download build-input --pattern inputs-v2.bin
+          gh release download build-input --pattern mobileclip-v2.bin
+          gh release download build-input --pattern fg54-overlay-v4.bin
+          gh release download build-input --pattern fg54-validated-model.bin
+          gh release download build-input --pattern fg55-overlay-v1.bin
+          gh release download build-input --pattern fg56-overlay-v2.bin
+          gh release download build-input --pattern fg57-overlay-v3.bin
+          python runner-crypto.py decrypt inputs-v2.bin inputs.zip
+          python runner-crypto.py decrypt mobileclip-v2.bin overlay.zip
+          python runner-crypto.py decrypt fg54-overlay-v4.bin patch.zip
+          python runner-crypto.py decrypt fg54-validated-model.bin models.zip
+          python runner-crypto.py decrypt fg55-overlay-v1.bin cleanup.zip
+          python runner-crypto.py decrypt fg56-overlay-v2.bin current.zip
+          python runner-crypto.py decrypt fg57-overlay-v3.bin fix.zip
+          gh release download build-input --pattern fg58-overlay-v3.bin
+          gh release download build-input --pattern fg58-models-v1.bin
+          python runner-crypto.py decrypt fg58-overlay-v3.bin build58.zip
+          python runner-crypto.py decrypt fg58-models-v1.bin models58.zip
+          mkdir app result
+          unzip -q inputs.zip -d app
+          unzip -o -q overlay.zip -d app
+          unzip -o -q patch.zip -d app
+          unzip -q models.zip -d app
+          unzip -o -q cleanup.zip -d app
+          unzip -o -q current.zip -d app
+          unzip -o -q fix.zip -d app
+          unzip -o -q build58.zip -d app
+          unzip -o -q models58.zip -d app
+          gh release download build-input --pattern b32-lut8-validation-v1.bin
+          python runner-crypto.py decrypt b32-lut8-validation-v1.bin candidate.zip
+          unzip -o -q candidate.zip -d app
+          cd app
+          cp candidate-source.txt candidate-model-digest.txt ../result/
+          model=build/model-validation/B32LUT8Validation
+          cp "$model/GPUExportReport.json" "$model/SigLIP2Manifest.json" ../result/
+          test "$(shasum -a 256 "$model/SigLIP2Image.mlpackage/Data/com.apple.CoreML/model.mlmodel" | cut -d ' ' -f1)" = "$(cat candidate-model-digest.txt)"
+          set +e
+          bash -euo pipefail -c '
+            model="$1"
+            mkdir -p build/b32-lut8-native
+            xcrun --sdk macosx coremlcompiler compile "$model/SigLIP2Image.mlpackage" build/b32-lut8-native
+            xcrun --sdk macosx swiftc -parse-as-library scripts/check-b32-vision.swift -o build/b32-lut8-native/verify
+            build/b32-lut8-native/verify build/b32-lut8-native/SigLIP2Image.mlmodelc "$model"
+            build/b32-lut8-native/verify build/b32-lut8-native/SigLIP2Image.mlmodelc "$model" cpuAndNeuralEngine
+          ' _ "$model" > ../result/NativeVision.log 2>&1
+          native=$?
+          bash -euo pipefail -c '
+            xcodebuild -version
+            bash scripts/prepare-b32-dependencies.sh
+            xcodegen generate --spec project-b32.yml
+            xcodebuild -project PhotoTextSearch.xcodeproj -scheme PhotoTextSearch -configuration Release \
+              -destination "generic/platform=iOS" -derivedDataPath build/device \
+              SWIFT_ACTIVE_COMPILATION_CONDITIONS=PREVIEW_UNLIMITED_INDEX CODE_SIGNING_ALLOWED=NO build
+            xcrun lipo build/device/Build/Products/Release-iphoneos/PhotoTextSearch.app/PhotoTextSearch -verify_arch arm64
+            mkdir -p build/b32-lut8-device
+            xcrun --sdk iphoneos coremlcompiler compile "$1/SigLIP2Image.mlpackage" build/b32-lut8-device
+            test -d build/b32-lut8-device/SigLIP2Image.mlmodelc
+          ' _ "$model" > ../result/Build.log 2>&1
+          device=$?
+          retrieval=99
+          if [[ "$native" -eq 0 && "$device" -eq 0 ]]; then
+            bash -euo pipefail <<'TEST' > ../result/Retrieval.log 2>&1
+          model=build/model-validation/B32LUT8Validation
+          baseline=build/model-validation/SigLIP2B32INT8-40000
+          simulator=$(xcrun simctl list devices available --json | python3 -c '
+          import json,sys
+          devices=json.load(sys.stdin)["devices"]
+          print(next(device["udid"] for runtime in devices.values() for device in runtime if device["name"].startswith("iPhone")))
+          ')
+          xcrun simctl boot "$simulator" || xcrun simctl bootstatus "$simulator" -b
+          fixtures=build/model-validation/B32NativeFixtures.bundle
+          mkdir -p "$fixtures"
+          cp "$model"/SigLIP2{Manifest,B32Reference}.json "$model"/*.bgra "$model"/*.jpg "$fixtures/"
+          cp "$baseline/SigLIP2Tokenizer.json" "$fixtures/"
+          bash scripts/stage-b32-translation.sh iphonesimulator "$fixtures/TinyTranslation"
+          xcrun --sdk iphonesimulator coremlcompiler compile "$model/SigLIP2Image.mlpackage" "$fixtures"
+          xcrun --sdk iphonesimulator coremlcompiler compile "$baseline/SigLIP2Text.mlpackage" "$fixtures"
+          python - "$fixtures/Info.plist" <<'PLIST'
+          import plistlib,sys
+          with open(sys.argv[1],"wb") as out:
+              plistlib.dump({"CFBundleIdentifier":"com.phototextsearch.ios.b32.lut8.fixture",
+                             "CFBundlePackageType":"BNDL","CFBundleVersion":"1",
+                             "PTSSigLIP2Preview":True,"PTSSigLIP2B32OpusPreview":True,
+                             "PTSSigLIP2B32FastPreview":True},out)
+          PLIST
+          xcodegen generate --spec project-b32.yml
+          xcodebuild -project PhotoTextSearch.xcodeproj -scheme PhotoTextSearch \
+            -destination "platform=iOS Simulator,id=$simulator" -derivedDataPath build/sim \
+            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO \
+            -only-testing:PhotoTextSearchTests/B32PreviewTests -only-testing:PhotoTextSearchTests/IndexSelectionTests test
+          TEST
+            retrieval=$?
+          fi
+          set -e
+          cd ..
+          printf 'native=%s\ndevice=%s\nretrieval=%s\n' "$native" "$device" "$retrieval" > result/status.txt
+          (cd result && zip -q -0 ../results.zip ./*)
+          python runner-crypto.py encrypt results.zip result.bin
+          [[ "$native" -eq 0 && "$device" -eq 0 && "$retrieval" -eq 0 ]]
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: encrypted-b32-lut8-result
+          path: result.bin
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 2
