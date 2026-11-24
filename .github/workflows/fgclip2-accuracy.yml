@@ -17,8 +17,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release download build-input --pattern fgclip2-accuracy-20261124-v1.bin
-          python runner-crypto.py decrypt fgclip2-accuracy-20261124-v1.bin probe.zip
+          gh release download build-input --pattern fgclip2-accuracy-20261124-v2.bin
+          python runner-crypto.py decrypt fgclip2-accuracy-20261124-v2.bin probe.zip
           unzip -q probe.zip -d probe
           (cd probe && shasum -a 256 -c SHA256SUMS)
           mkdir report
