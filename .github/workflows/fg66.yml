@@ -55,8 +55,8 @@ jobs:
           gh release download build-input --pattern fg65-overlay-v1.bin
           python runner-crypto.py decrypt fg65-overlay-v1.bin build65.zip
           unzip -o -q build65.zip -d app
-          gh release download build-input --pattern fg66-overlay-v1.bin
-          python runner-crypto.py decrypt fg66-overlay-v1.bin build66.zip
+          gh release download build-input --pattern fg66-overlay-v2.bin
+          python runner-crypto.py decrypt fg66-overlay-v2.bin build66.zip
           unzip -o -q build66.zip -d app
           python - <<'VERIFY'
           import hashlib, json
