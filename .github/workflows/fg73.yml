@@ -52,8 +52,8 @@ jobs:
           gh release download build-input --pattern fg64-overlay-v1.bin
           python runner-crypto.py decrypt fg64-overlay-v1.bin build64.zip
           unzip -o -q build64.zip 'build/model-validation/FGCLIP2Quality/*' 'build/model-validation/SFaceBuild58/*' -d app
-          gh release download build-input --pattern fg73-overlay-v1.bin
-          python runner-crypto.py decrypt fg73-overlay-v1.bin build73.zip
+          gh release download build-input --pattern fg73-overlay-v2.bin
+          python runner-crypto.py decrypt fg73-overlay-v2.bin build73.zip
           unzip -o -q build73.zip -d app
           test ! -e app/PhotoTextSearch/ArtAlbums
           test ! -e app/PhotoTextSearchTests/ArtAlbumTests.swift
